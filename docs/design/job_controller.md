@@ -3,7 +3,7 @@
 ## Abstract
 
 First basic implementation proposal for a Job controller.
-Several exiting issues were already created regarding that particular subject:
+Several issues exist regarding this subject:
 - [Distributed CRON jobs in k8s #2156](https://github.com/GoogleCloudPlatform/kubernetes/issues/2156)
 - [Job Controller #1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)
 
@@ -58,8 +58,6 @@ Compared to a ReplicationController, there is no replica count since only 1 pod 
 * The max execution time per pod run in seconds. Reaching this limit leads to the pod being pro-actively destroyed.
 
 Regarding restart policy, it will be necessary to allow failing containers within a pod to be restarted a limited number of times in case of failure. The OnFailure restart policy defined at pod spec level can be extended to carry this information (the restart count for a given container is already available) and would be used by the kubelet to take this maximal restart field into account.
-
-**TODO: Spec the above in more detail**
 
 Job controller has the responsibility to advertise pod completion status (success or failure) through events, and to delete it from the pod registry. Collecting the standard output/error of pod's containers is not covered by this design (a common solution for containers started by any controller is needed).
 
@@ -142,6 +140,6 @@ The job controller will on a recurring basis perform the following actions:
 
 ## Possible shortcomings
 
-The previous design would work if all containers started in a pod scheduled by this job controller have a finite execution time. However, we might have the case of containers with unlimited lifetime (for instance, daemons providing services for the job container to perform its work). In that case, the started pod will remain in a running state (and possibly only stop once its execution timeout is reached).
+This design will work if all containers started in a pod scheduled by this job controller have a finite execution time. However, we might have the case of containers with unlimited lifetime (for instance, daemons providing services for the job container to perform its work). In that case, the started pod will remain in a running state (and possibly only stop once its execution timeout is reached).
 We can somehow define the notion of leading containers within a pod managed by a job controller, to be able to restrict the lifetime of the whole pod to this single container.
 Once the container exits, the whole pod is (gracefully) stopped and the final status of the leading container is given to the whole pod. This leading container could be specified with a new bool attribute at container level in the pod template definition.
