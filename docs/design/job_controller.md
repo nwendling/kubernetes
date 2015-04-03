@@ -7,6 +7,8 @@ Several exiting issues were already created regarding that particular subject:
 - [Distributed CRON jobs in k8s #2156](https://github.com/GoogleCloudPlatform/kubernetes/issues/2156)
 - [Job Controller #1624](https://github.com/GoogleCloudPlatform/kubernetes/issues/1624)
 
+A need for a new controller is also mentioned in [here](https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/pod-states.md#controllers-and-restartpolicy)
+
 Several features also already exist that could be used by external tools to trigger batch execution on one pod within k8 cluster.
 - Create a standalone pod (not linked to any existing replication controllers)
 - Execute a new process within a given container from a running pod.
@@ -16,8 +18,20 @@ Several features also already exist that could be used by external tools to trig
 The main goal is to provide a new controller type with the following characteristics:
 * Time initiated creation of a pod.
 * Pod creation schedule (ISO8601) included in the controller definition.
+
+Both of the above will be handled by single definition (see http://en.wikipedia.org/wiki/ISO_8601).
+As with this standard you're defining the starting point and repeating intervals.
+
 * (Future evolution) Track outcome of the pod and apply e.g. restart policy in case of failure.
 * (Future evolution) Trigger jobs based on success/failure of others.
+
+Since k8s already has 2 unused restart policies (Never and OnFailure) I've proposed to use
+them here, where:
+* `Never` - would allow creating run once pod's
+* `OnFailure` - would allow acting upon pod's failure/success
+I'd name both in that proposal, besides in the proposal I don't think we need to show this
+as future evolution. The proposal should be complete, the implementation will be done
+in a couple of steps IMHO.
 
 ## Job controller basic definition
 
@@ -26,12 +40,12 @@ The new controller json definition for a basic implementation will have the foll
 ```
 {
 	"apiVersion": "v1beta3",
-	"kind": "JobController",
+	"kind": "JobController",    <-- that's debatable but maybe we could call it just Job?
 	"id": "myjob-controller",
 	"desiredState": {
 		"schedulePolicy": {
 			"timeSpec": "R5/T01:00:00/PT01",
-			"execTimeout": 100,
+			"execTimeout": 100,  <-- this will be part of Quota and Resource limiting @derekwaynecarr is already working on (can't find any specific issue, but I can get back with details if you want)
 			"maxRestart" : 2
 		},
 		"selector": { "name": "myjob"},
@@ -51,6 +65,10 @@ The new controller json definition for a basic implementation will have the foll
 	}
 }
 ```
+
+As said before I'd add here those on failure/success reactions, though I don't known
+how it should look like yet ;) And one other very important thing: wheather this job
+is allowed to run in parallel, meaning two copies of this job are or not allowed.
 
 Compared to a ReplicationController, there is no replica count since only 1 pod will be created.  JobController introduces a schedulePolicy structure which specifies:
 * The schedule (using ISO8601 notation) to apply for launching the pod.
@@ -129,6 +147,8 @@ type JobControllerList struct {
 ```
 
 Current ReplicationManager will be reused and extended to provide a generic management for all controller types.
+
+Not sure about that, I'd rather propose writing one from scratch.
 
 The job controller will on a recurring basis perform the following actions:
 
